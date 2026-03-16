@@ -1,0 +1,17 @@
+appId: com.footnotewriter.app
+productName: FootNote Writer
+directories:
+  output: release
+files:
+  - dist/**/*
+  - node_modules/**/*
+mac:
+  target:
+    - dmg
+  category: public.app-category.productivity
+win:
+  target:
+    - nsis
+nsis:
+  oneClick: false
+  allowToChangeInstallationDirectory: true
