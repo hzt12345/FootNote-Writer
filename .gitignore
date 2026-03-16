@@ -3,3 +3,5 @@ dist/
 release/
 *.db
 .DS_Store
+.claude/
+.serena/
