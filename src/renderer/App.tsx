@@ -103,9 +103,21 @@ export default function App() {
       const parsed = parseFootnotes(result.content)
       // Convert body with markers back to display text
       const displayBody = parsed.body.replace(/\{\{FN:(\d+)\}\}/g, (_m, num) => `[^${num}]`)
+
+      // Verify AI didn't alter the original text
+      const stripFootnoteMarkers = (s: string) => s.replace(/\[\^?\d+\]/g, '').replace(/\s+/g, '').trim()
+      const originalClean = stripFootnoteMarkers(bodyText)
+      const resultClean = stripFootnoteMarkers(displayBody)
+
+      if (resultClean !== originalClean) {
+        const warning = `⚠️ 警告：AI可能修改了原文内容，请仔细核对！生成了 ${parsed.footnotes.size} 个脚注`
+        setStatus(warning)
+      } else {
+        setStatus(`完成！生成了 ${parsed.footnotes.size} 个脚注，原文内容未被修改 ✓`)
+      }
+
       setResultText(displayBody)
       setFootnotes(parsed.footnotes)
-      setStatus(`完成！生成了 ${parsed.footnotes.size} 个脚注`)
     }
   }, [bodyText, hasApiKey, references, templates, selectedTemplateId])
 

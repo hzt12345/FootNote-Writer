@@ -260,7 +260,9 @@ export function registerIPC() {
                   console.log('[MiniMax] content length:', (msg.content || '').length, 'reasoning_content length:', (msg.reasoning_content || '').length)
                   console.log('[MiniMax] content preview:', (msg.content || '').slice(0, 200))
                   console.log('[MiniMax] reasoning preview:', (msg.reasoning_content || '').slice(0, 200))
-                  const content = msg.content || msg.reasoning_content || ''
+                  const raw = msg.content || msg.reasoning_content || ''
+                  // Clean up garbled Unicode replacement characters from AI output
+                  const content = raw.replace(/\ufffd/g, '')
                   resolve({ content })
                 } else {
                   resolve({ error: `意外的响应格式: ${data.slice(0, 300)}` })
