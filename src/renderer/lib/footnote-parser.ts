@@ -64,7 +64,38 @@ export function parseFootnotes(text: string): ParseResult {
   // Handle [N] format (plain), but only if not already replaced and it's a number
   body = body.replace(/(?<!\{FN:)\[(\d+)\](?!:)/g, (_match, num) => `{{FN:${num}}}`)
 
+  // Fix English quotes back to Chinese quotes in footnote content
+  // AI often converts "" to "" in Chinese text
+  for (const [id, content] of footnotes) {
+    footnotes.set(id, fixChineseQuotes(content))
+  }
+
   return { body, footnotes }
+}
+
+/**
+ * Convert English double quotes to Chinese double quotes in Chinese text context.
+ * Pairs quotes: odd " becomes left ", even " becomes right ".
+ */
+function fixChineseQuotes(text: string): string {
+  // Only fix if text contains Chinese characters (indicating Chinese context)
+  if (!/[\u4e00-\u9fff]/.test(text)) return text
+
+  // Replace paired straight double quotes with Chinese quotes
+  let count = 0
+  let result = text.replace(/"/g, () => {
+    count++
+    return count % 2 === 1 ? '\u201c' : '\u201d' // "" pair
+  })
+
+  // Same for single quotes in Chinese context
+  let sCount = 0
+  result = result.replace(/'/g, () => {
+    sCount++
+    return sCount % 2 === 1 ? '\u2018' : '\u2019' // '' pair
+  })
+
+  return result
 }
 
 /**

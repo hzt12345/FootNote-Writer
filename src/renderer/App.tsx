@@ -13,6 +13,85 @@ import {
 
 const { ipcRenderer } = window.require('electron')
 
+/**
+ * Graft footnote markers from AI output onto the original text.
+ * AI may have altered wording, but we want to keep original text intact
+ * and only take the footnote marker positions.
+ */
+function graftFootnotesOntoOriginal(original: string, aiBody: string): string {
+  // Extract footnote markers and their preceding context from AI output
+  const markerRegex = /\[\^?(\d+)\]/g
+  const markers: { id: string; beforeText: string; afterChar: string }[] = []
+  let lastEnd = 0
+  let match: RegExpExecArray | null
+
+  while ((match = markerRegex.exec(aiBody)) !== null) {
+    // Get text chunk before this marker (between previous marker and this one)
+    const before = aiBody.slice(lastEnd, match.index)
+    // Strip any other markers from the before-text to get pure text
+    const cleanBefore = before.replace(/\[\^?\d+\]/g, '')
+    // Take last N chars as anchor context
+    const anchor = cleanBefore.slice(-20)
+    // Get char right after marker for additional context
+    const afterIdx = match.index + match[0].length
+    const afterChar = aiBody[afterIdx] || ''
+    markers.push({ id: match[1], beforeText: anchor, afterChar })
+    lastEnd = afterIdx
+  }
+
+  if (markers.length === 0) return original
+
+  // For each marker, find best insertion point in original text
+  // Work backwards to preserve positions
+  let result = original
+  const insertions: { pos: number; marker: string }[] = []
+
+  for (const m of markers) {
+    const anchor = m.beforeText.replace(/\s+/g, '')
+    if (!anchor) continue
+
+    // Scan original to find the anchor text
+    let bestPos = -1
+    let bestLen = 0
+    // Try matching increasingly shorter suffixes of anchor
+    for (let len = anchor.length; len >= Math.min(3, anchor.length); len--) {
+      const suffix = anchor.slice(-len)
+      // Search in original (normalized), map back to original position
+      let oi = 0 // position in original
+      let ni = 0 // position in normalized (no whitespace) view
+      const origNorm = result.replace(/\s+/g, '')
+
+      const idx = origNorm.indexOf(suffix, 0)
+      if (idx === -1) continue
+
+      // Map normalized position back to original position
+      const targetNormEnd = idx + suffix.length
+      let normCount = 0
+      let origPos = 0
+      for (origPos = 0; origPos < result.length && normCount < targetNormEnd; origPos++) {
+        if (!/\s/.test(result[origPos])) normCount++
+      }
+
+      bestPos = origPos
+      bestLen = len
+      break
+    }
+
+    if (bestPos >= 0) {
+      insertions.push({ pos: bestPos, marker: `[^${m.id}]` })
+    }
+  }
+
+  // Sort by position descending so insertions don't shift earlier positions
+  insertions.sort((a, b) => b.pos - a.pos)
+  // Deduplicate: if multiple markers at same position, keep all (append)
+  for (const ins of insertions) {
+    result = result.slice(0, ins.pos) + ins.marker + result.slice(ins.pos)
+  }
+
+  return result
+}
+
 export default function App() {
   const {
     settings, setSettings,
@@ -102,21 +181,31 @@ export default function App() {
     } else if (result.content) {
       const parsed = parseFootnotes(result.content)
       // Convert body with markers back to display text
-      const displayBody = parsed.body.replace(/\{\{FN:(\d+)\}\}/g, (_m, num) => `[^${num}]`)
+      const aiBody = parsed.body.replace(/\{\{FN:(\d+)\}\}/g, (_m, num) => `[^${num}]`)
 
-      // Verify AI didn't alter the original text
-      const stripFootnoteMarkers = (s: string) => s.replace(/\[\^?\d+\]/g, '').replace(/\s+/g, '').trim()
-      const originalClean = stripFootnoteMarkers(bodyText)
-      const resultClean = stripFootnoteMarkers(displayBody)
+      // === Auto-recovery: graft footnote markers onto original text ===
+      // Strip footnote markers from AI output to get the "AI's version" of plain text
+      const stripMarkers = (s: string) => s.replace(/\[\^?\d+\]/g, '')
+      const aiPlain = stripMarkers(aiBody)
+      const originalPlain = bodyText
 
-      if (resultClean !== originalClean) {
-        const warning = `⚠️ 警告：AI可能修改了原文内容，请仔细核对！生成了 ${parsed.footnotes.size} 个脚注`
-        setStatus(warning)
-      } else {
+      // Normalize for comparison (ignore whitespace differences)
+      const norm = (s: string) => s.replace(/\s+/g, '').trim()
+
+      let finalBody: string
+      if (norm(aiPlain) === norm(originalPlain)) {
+        // AI didn't modify the text — use AI output directly
+        finalBody = aiBody
         setStatus(`完成！生成了 ${parsed.footnotes.size} 个脚注，原文内容未被修改 ✓`)
+      } else {
+        // AI modified the text — graft footnote markers back onto original
+        // Strategy: walk through AI output char by char, extract marker positions
+        // relative to surrounding text, then insert into original
+        finalBody = graftFootnotesOntoOriginal(originalPlain, aiBody)
+        setStatus(`完成！生成了 ${parsed.footnotes.size} 个脚注（已自动恢复原文，AI的修改已被丢弃）`)
       }
 
-      setResultText(displayBody)
+      setResultText(finalBody)
       setFootnotes(parsed.footnotes)
     }
   }, [bodyText, hasApiKey, references, templates, selectedTemplateId])
