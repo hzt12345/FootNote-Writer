@@ -139,7 +139,7 @@ export default function Editor() {
     const templateFormat = selectedTemplate?.format
 
     const result = await sendChatMessage(
-      [{ role: 'user', content: `请为以下正文补充脚注。直接返回带脚注标记的完整正文，不要解释。\n\n${plainText}` }],
+      [{ role: 'user', content: `请为以下正文补充脚注。严格要求：\n1. 绝对不能修改原文的任何文字，包括标点符号、措辞、语序，一个字都不能改\n2. 只能在需要标注的位置插入脚注标记如[^1]\n3. 只使用我提供的参考文献，不要编造任何文献\n4. 在正文末尾列出脚注定义\n\n直接返回带脚注标记的完整正文，不要解释。\n\n${plainText}` }],
       {
         references: references.length > 0 ? references : undefined,
         templateFormat,
