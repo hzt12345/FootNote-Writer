@@ -37,34 +37,26 @@ export function parseFootnotes(text: string): ParseResult {
   // Format A: [N] content (at start of line, as definition)
   const defRegexA = /^\[(\d+)\]\s+(.+)$/
 
-  // Find where footnote definitions start
-  let defStartIndex = lines.length
-  for (let i = lines.length - 1; i >= 0; i--) {
-    const line = lines[i].trim()
-    if (line === '') continue
-    if (defRegexB.test(line) || defRegexA.test(line)) {
-      defStartIndex = i
-    } else {
-      break
-    }
-  }
-
-  // Extract definitions
-  for (let i = defStartIndex; i < lines.length; i++) {
+  // Scan ALL lines for footnote definitions, not just from the end
+  // This handles cases where definitions are mixed with blank lines
+  const defLines = new Set<number>()
+  for (let i = 0; i < lines.length; i++) {
     const line = lines[i].trim()
     let match = defRegexB.exec(line)
     if (match) {
       footnotes.set(parseInt(match[1], 10), match[2].trim())
+      defLines.add(i)
       continue
     }
     match = defRegexA.exec(line)
     if (match) {
       footnotes.set(parseInt(match[1], 10), match[2].trim())
+      defLines.add(i)
     }
   }
 
-  // Body = everything before definitions
-  let body = lines.slice(0, defStartIndex).join('\n').trimEnd()
+  // Body = all lines that are NOT footnote definitions
+  let body = lines.filter((_line, i) => !defLines.has(i)).join('\n').trimEnd()
 
   // Replace inline markers with {{FN:id}} placeholders
   // Handle [^N] format (Markdown)
