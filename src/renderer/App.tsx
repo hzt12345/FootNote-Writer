@@ -13,6 +13,63 @@ import {
 
 const { ipcRenderer } = window.require('electron')
 
+interface TextDiff {
+  original: string
+  modified: string
+}
+
+/**
+ * Compute meaningful text diffs between original and modified text.
+ * Splits into sentences/segments and compares, ignoring pure whitespace diffs.
+ */
+function computeTextDiffs(original: string, modified: string): TextDiff[] {
+  const diffs: TextDiff[] = []
+
+  // Split into sentences by Chinese/English sentence-ending punctuation
+  const splitSentences = (s: string) =>
+    s.split(/(?<=[。！？；\n])/g).map(t => t.trim()).filter(Boolean)
+
+  const origSentences = splitSentences(original)
+  const modSentences = splitSentences(modified)
+
+  // Simple longest-common-subsequence alignment by normalized content
+  const normSentence = (s: string) => s.replace(/\s+/g, '').replace(/[，。！？；、：""''《》（）\(\)\[\]]/g, '')
+
+  const origNormed = origSentences.map(normSentence)
+  const modNormed = modSentences.map(normSentence)
+
+  // Pair up sentences that share enough content
+  const used = new Set<number>()
+  for (let i = 0; i < origSentences.length; i++) {
+    let bestJ = -1
+    let bestScore = 0
+    for (let j = 0; j < modSentences.length; j++) {
+      if (used.has(j)) continue
+      // Simple similarity: matching chars / max length
+      const a = origNormed[i]
+      const b = modNormed[j]
+      if (!a || !b) continue
+      let matches = 0
+      const shorter = a.length < b.length ? a : b
+      const longer = a.length < b.length ? b : a
+      for (const ch of shorter) {
+        if (longer.includes(ch)) matches++
+      }
+      const score = matches / Math.max(a.length, b.length)
+      if (score > bestScore && score > 0.5) {
+        bestScore = score
+        bestJ = j
+      }
+    }
+    if (bestJ >= 0 && origNormed[i] !== modNormed[bestJ]) {
+      diffs.push({ original: origSentences[i].slice(0, 80), modified: modSentences[bestJ].slice(0, 80) })
+      used.add(bestJ)
+    }
+  }
+
+  return diffs
+}
+
 /**
  * Graft footnote markers from AI output onto the original text.
  * AI may have altered wording, but we want to keep original text intact
@@ -183,26 +240,48 @@ export default function App() {
       // Convert body with markers back to display text
       const aiBody = parsed.body.replace(/\{\{FN:(\d+)\}\}/g, (_m, num) => `[^${num}]`)
 
-      // === Auto-recovery: graft footnote markers onto original text ===
-      // Strip footnote markers from AI output to get the "AI's version" of plain text
+      // === Diff + LLM verification ===
       const stripMarkers = (s: string) => s.replace(/\[\^?\d+\]/g, '')
       const aiPlain = stripMarkers(aiBody)
       const originalPlain = bodyText
-
-      // Normalize for comparison (ignore whitespace differences)
       const norm = (s: string) => s.replace(/\s+/g, '').trim()
 
       let finalBody: string
       if (norm(aiPlain) === norm(originalPlain)) {
-        // AI didn't modify the text — use AI output directly
+        // Exact match after normalization — no modification
         finalBody = aiBody
         setStatus(`完成！生成了 ${parsed.footnotes.size} 个脚注，原文内容未被修改 ✓`)
       } else {
-        // AI modified the text — graft footnote markers back onto original
-        // Strategy: walk through AI output char by char, extract marker positions
-        // relative to surrounding text, then insert into original
-        finalBody = graftFootnotesOntoOriginal(originalPlain, aiBody)
-        setStatus(`完成！生成了 ${parsed.footnotes.size} 个脚注（已自动恢复原文，AI的修改已被丢弃）`)
+        // There are diffs — compute them and ask LLM if they are substantial
+        const diffs = computeTextDiffs(originalPlain, aiPlain)
+
+        if (diffs.length === 0) {
+          // Only trivial whitespace diffs
+          finalBody = aiBody
+          setStatus(`完成！生成了 ${parsed.footnotes.size} 个脚注，原文内容未被修改 ✓`)
+        } else {
+          // Ask LLM: are these diffs substantial modifications?
+          setStatus(`检测到 ${diffs.length} 处差异，正在用 AI 判断是否为实质性修改...`)
+          const diffSummary = diffs.slice(0, 20).map((d, i) =>
+            `${i + 1}. 原文「${d.original}」→ AI版「${d.modified}」`
+          ).join('\n')
+
+          const verifyResult = await sendChatMessage(
+            [{ role: 'user', content: `我让AI给一段文章补脚注，要求不修改原文。AI返回的结果和原文有以下差异：\n\n${diffSummary}\n\n请判断：这些差异是否属于"实质性修改"（改了原文意思、措辞、增删了内容）？还是只是无关紧要的差异（空格、标点微调、格式化）？\n\n只回答一个词："实质性" 或 "非实质性"` }],
+          )
+
+          const isSubstantial = verifyResult.content?.includes('实质性') && !verifyResult.content?.includes('非实质性')
+
+          if (isSubstantial) {
+            // Substantial modification — graft markers onto original
+            finalBody = graftFootnotesOntoOriginal(originalPlain, aiBody)
+            setStatus(`完成！生成了 ${parsed.footnotes.size} 个脚注（检测到实质性修改，已自动恢复原文）`)
+          } else {
+            // Non-substantial — use AI output as-is
+            finalBody = aiBody
+            setStatus(`完成！生成了 ${parsed.footnotes.size} 个脚注（差异为非实质性修改，已采纳）`)
+          }
+        }
       }
 
       setResultText(finalBody)

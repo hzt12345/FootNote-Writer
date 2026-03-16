@@ -93,14 +93,38 @@ function buildParagraph(
   })
 }
 
+/**
+ * Convert English quotes to Chinese quotes in Chinese text context.
+ */
+function fixChineseQuotes(text: string): string {
+  if (!/[\u4e00-\u9fff]/.test(text)) return text
+  let count = 0
+  let result = text.replace(/"/g, () => {
+    count++
+    return count % 2 === 1 ? '\u201c' : '\u201d'
+  })
+  let sCount = 0
+  result = result.replace(/'/g, () => {
+    sCount++
+    return sCount % 2 === 1 ? '\u2018' : '\u2019'
+  })
+  return result
+}
+
 export async function exportToDocx(options: ExportOptions, savePath: string): Promise<void> {
   const font = options.font || '宋体'
   const fontSize = options.fontSize || 24 // 12pt = 24 half-points
 
+  // Fix Chinese quotes in paragraphs before export
+  for (const p of options.paragraphs) {
+    p.text = fixChineseQuotes(p.text)
+  }
+
   // Build footnotes object for Document constructor
   const footnotes: Record<number, { children: Paragraph[] }> = {}
-  for (const [idStr, content] of Object.entries(options.footnotes)) {
+  for (const [idStr, rawContent] of Object.entries(options.footnotes)) {
     const id = parseInt(idStr, 10)
+    const content = fixChineseQuotes(rawContent)
     // Parse *text* into italic runs using regex to find *...* spans
     const runs: TextRun[] = []
     const italicRegex = /\*([^*]+)\*/g
