@@ -33,6 +33,37 @@ export function initDB() {
     );
   `)
 
+  // Migration: add group_name column if missing
+  try {
+    db.exec(`ALTER TABLE footnote_templates ADD COLUMN group_name TEXT DEFAULT NULL`)
+  } catch {
+    // Column already exists
+  }
+
+  // Update existing presets with group names if null
+  const ungrouped = db.prepare('SELECT COUNT(*) as c FROM footnote_templates WHERE is_preset = 1 AND group_name IS NULL').get() as { c: number }
+  if (ungrouped.c > 0) {
+    db.exec(`UPDATE footnote_templates SET group_name = '法学引注手册' WHERE is_preset = 1 AND group_name IS NULL`)
+  }
+  // Seed new presets if they don't exist yet
+  const totalPresets = db.prepare('SELECT COUNT(*) as c FROM footnote_templates WHERE is_preset = 1').get() as { c: number }
+  if (totalPresets.c < 15) {
+    const newPresets = [
+      { name: '专著', format: '[{序号}] {作者}.{书名}[M].{出版地}:{出版者},{出版年}:{页码}.', group: 'GB/T 7714' },
+      { name: '期刊文章', format: '[{序号}] {作者}.{文章题名}[J].{期刊名},{年},{卷}({期}):{页码}.', group: 'GB/T 7714' },
+      { name: '学位论文', format: '[{序号}] {作者}.{题名}[D].{保存地点}:{保存单位},{年份}.', group: 'GB/T 7714' },
+      { name: '网络文献', format: '[{序号}] {作者}.{题名}[EB/OL].({发表日期})[{引用日期}].{URL}.', group: 'GB/T 7714' },
+      { name: 'Book', format: '{Author}, {Initials}. ({Year}). *{Title}*. {Publisher}.', group: 'APA 7th' },
+      { name: 'Journal Article', format: '{Author}, {Initials}. ({Year}). {Title}. *{Journal}*, *{Volume}*({Issue}), {Pages}.', group: 'APA 7th' },
+      { name: 'Note (脚注式)', format: '{Author}, *{Title}* ({Place}: {Publisher}, {Year}), {Page}.', group: 'Chicago' },
+      { name: 'Bibliography (书目式)', format: '{Author}. *{Title}*. {Place}: {Publisher}, {Year}.', group: 'Chicago' },
+    ]
+    const stmtNew = db.prepare('INSERT INTO footnote_templates (name, format, is_preset, group_name) VALUES (?, ?, 1, ?)')
+    for (const p of newPresets) {
+      stmtNew.run(p.name, p.format, p.group)
+    }
+  }
+
   // Seed preset templates if empty
   const count = db.prepare('SELECT COUNT(*) as c FROM footnote_templates WHERE is_preset = 1').get() as { c: number }
   if (count.c === 0) {
@@ -41,18 +72,30 @@ export function initDB() {
 }
 
 function seedPresetTemplates() {
-  const presets: { name: string; format: string }[] = [
-    { name: '中文著作', format: '{作者}：《{书名}》，{出版社}{年份}年版，第{页码}页。' },
-    { name: '中文期刊', format: '{作者}：《{文章名}》，载《{期刊名}》{年份}年第{期号}期。' },
-    { name: '外文著作', format: '{Author}, {Title} ({Publisher}, {Year}), p. {Page}.' },
-    { name: '外文期刊', format: '{Author}, "{Title}", {Journal}, Vol.{Volume}, No.{Issue} ({Year}).' },
-    { name: '法律法规', format: '《{法规名}》第{条款}条。' },
-    { name: '司法解释', format: '《{文件名}》（{文号}）第{条款}条。' },
-    { name: '案例', format: '{案件名}，{法院}（{案号}）。' },
+  const presets: { name: string; format: string; group: string }[] = [
+    // 法学引注手册
+    { name: '中文著作', format: '{作者}：《{书名}》，{出版社}{年份}年版，第{页码}页。', group: '法学引注手册' },
+    { name: '中文期刊', format: '{作者}：《{文章名}》，载《{期刊名}》{年份}年第{期号}期。', group: '法学引注手册' },
+    { name: '外文著作', format: '{Author}, {Title} ({Publisher}, {Year}), p. {Page}.', group: '法学引注手册' },
+    { name: '外文期刊', format: '{Author}, "{Title}", {Journal}, Vol.{Volume}, No.{Issue} ({Year}).', group: '法学引注手册' },
+    { name: '法律法规', format: '《{法规名}》第{条款}条。', group: '法学引注手册' },
+    { name: '司法解释', format: '《{文件名}》（{文号}）第{条款}条。', group: '法学引注手册' },
+    { name: '案例', format: '{案件名}，{法院}（{案号}）。', group: '法学引注手册' },
+    // GB/T 7714
+    { name: '专著', format: '[{序号}] {作者}.{书名}[M].{出版地}:{出版者},{出版年}:{页码}.', group: 'GB/T 7714' },
+    { name: '期刊文章', format: '[{序号}] {作者}.{文章题名}[J].{期刊名},{年},{卷}({期}):{页码}.', group: 'GB/T 7714' },
+    { name: '学位论文', format: '[{序号}] {作者}.{题名}[D].{保存地点}:{保存单位},{年份}.', group: 'GB/T 7714' },
+    { name: '网络文献', format: '[{序号}] {作者}.{题名}[EB/OL].({发表日期})[{引用日期}].{URL}.', group: 'GB/T 7714' },
+    // APA 第 7 版
+    { name: 'Book', format: '{Author}, {Initials}. ({Year}). *{Title}*. {Publisher}.', group: 'APA 7th' },
+    { name: 'Journal Article', format: '{Author}, {Initials}. ({Year}). {Title}. *{Journal}*, *{Volume}*({Issue}), {Pages}.', group: 'APA 7th' },
+    // Chicago
+    { name: 'Note (脚注式)', format: '{Author}, *{Title}* ({Place}: {Publisher}, {Year}), {Page}.', group: 'Chicago' },
+    { name: 'Bibliography (书目式)', format: '{Author}. *{Title}*. {Place}: {Publisher}, {Year}.', group: 'Chicago' },
   ]
-  const stmt = db.prepare('INSERT INTO footnote_templates (name, format, is_preset) VALUES (?, ?, 1)')
+  const stmt = db.prepare('INSERT INTO footnote_templates (name, format, is_preset, group_name) VALUES (?, ?, 1, ?)')
   for (const p of presets) {
-    stmt.run(p.name, p.format)
+    stmt.run(p.name, p.format, p.group)
   }
 }
 
@@ -80,7 +123,7 @@ export function deleteReference(id: number): void {
 
 // ---- Templates ----
 export function getTemplates(): FootnoteTemplate[] {
-  return db.prepare('SELECT id, name, format, is_preset as isPreset FROM footnote_templates ORDER BY is_preset DESC, id ASC').all() as FootnoteTemplate[]
+  return db.prepare('SELECT id, name, format, is_preset as isPreset, group_name as "group" FROM footnote_templates ORDER BY is_preset DESC, group_name, id ASC').all() as FootnoteTemplate[]
 }
 
 export function saveTemplate(tmpl: Omit<FootnoteTemplate, 'id' | 'isPreset'>): FootnoteTemplate {
@@ -98,6 +141,7 @@ export function getSettings(): AppSettings {
   const rows = db.prepare('SELECT key, value FROM settings').all() as { key: string; value: string }[]
   const map = new Map(rows.map(r => [r.key, r.value]))
   return {
+    providerId: map.get('providerId') || 'minimax',
     apiKey: map.get('apiKey') || '',
     apiBase: map.get('apiBase') || 'https://api.minimaxi.com',
     groupId: map.get('groupId') || '',
