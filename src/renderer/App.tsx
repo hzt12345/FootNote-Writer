@@ -162,6 +162,7 @@ export default function App() {
   const [footnotes, setFootnotes] = useState<Map<number, string>>(new Map())
   const [loading, setLoading] = useState(false)
   const [status, setStatus] = useState('')
+  const [exportMode, setExportMode] = useState<'footnote' | 'endnote' | 'bibliography'>('footnote')
 
   // Load settings, references, templates on mount
   useEffect(() => {
@@ -315,12 +316,13 @@ export default function App() {
       footnotes: fnObj,
       font: settings?.exportFont || '宋体',
       fontSize: (settings?.exportFontSize || 12) * 2,
+      mode: exportMode,
     })
 
     if (result.success) {
       setStatus(`导出成功: ${result.path}`)
     }
-  }, [resultText, bodyText, footnotes, settings])
+  }, [resultText, bodyText, footnotes, settings, exportMode])
 
   // ===== Settings view =====
   if (view === 'settings') {
@@ -444,13 +446,24 @@ export default function App() {
 
           {/* Step 4: Export */}
           {(resultText || bodyText) && (
-            <button
-              onClick={handleExport}
-              className="w-full flex items-center justify-center gap-2 py-4 bg-blue-600 text-white text-lg font-semibold rounded-xl hover:bg-blue-700 transition-colors"
-            >
-              <Download size={24} />
-              4. 导出 Word（原生脚注）
-            </button>
+            <div className="flex items-center gap-3">
+              <select
+                value={exportMode}
+                onChange={(e) => setExportMode(e.target.value as any)}
+                className="border rounded px-3 py-3 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+              >
+                <option value="footnote">脚注（页脚）</option>
+                <option value="endnote">尾注（文末）</option>
+                <option value="bibliography">参考文献列表</option>
+              </select>
+              <button
+                onClick={handleExport}
+                className="flex-1 flex items-center justify-center gap-2 py-4 bg-blue-600 text-white text-lg font-semibold rounded-xl hover:bg-blue-700 transition-colors"
+              >
+                <Download size={24} />
+                4. 导出 Word
+              </button>
+            </div>
           )}
 
           {/* Status bar */}
