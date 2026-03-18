@@ -229,6 +229,7 @@ export default function App() {
       {
         references: references.length > 0 ? references : undefined,
         templateFormat: selectedTemplate?.format,
+        templateGroup: selectedTemplate?.group || undefined,
       },
     )
 

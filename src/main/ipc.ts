@@ -8,6 +8,7 @@ import {
   getTemplates, saveTemplate, deleteTemplate,
   getSettings, saveSettings,
 } from './db'
+import { getCitationPrompt } from '../shared/citation-prompts'
 import https from 'https'
 import http from 'http'
 
@@ -181,7 +182,7 @@ export function registerIPC() {
   })
 
   // ---- MiniMax API Chat ----
-  ipcMain.handle(IPC.CHAT_SEND, async (_event, { messages, systemPrompt, references, templateFormat }) => {
+  ipcMain.handle(IPC.CHAT_SEND, async (_event, { messages, systemPrompt, references, templateFormat, templateGroup }) => {
     const settings = getSettings()
     if (!settings.apiKey) {
       return { error: '请先在设置中配置 API Key' }
@@ -189,6 +190,12 @@ export function registerIPC() {
 
     // Build system prompt with references and template
     let fullSystemPrompt = systemPrompt || settings.systemPrompt
+    if (templateGroup) {
+      const citationPrompt = getCitationPrompt(templateGroup)
+      if (citationPrompt) {
+        fullSystemPrompt += `\n\n${citationPrompt}`
+      }
+    }
     if (templateFormat) {
       fullSystemPrompt += `\n\n当前脚注格式模板：${templateFormat}`
     }

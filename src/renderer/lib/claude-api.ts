@@ -9,6 +9,7 @@ export async function sendChatMessage(
     systemPrompt?: string
     references?: Reference[]
     templateFormat?: string
+    templateGroup?: string
   }
 ): Promise<{ content?: string; error?: string }> {
   return ipcRenderer.invoke(IPC.CHAT_SEND, {
@@ -16,5 +17,6 @@ export async function sendChatMessage(
     systemPrompt: options?.systemPrompt,
     references: options?.references,
     templateFormat: options?.templateFormat,
+    templateGroup: options?.templateGroup,
   })
 }
