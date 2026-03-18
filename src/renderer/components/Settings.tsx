@@ -1,6 +1,7 @@
 import React, { useEffect, useState } from 'react'
 import { useStore } from '../lib/store'
 import { IPC, AppSettings } from '../../shared/types'
+import { LLM_PROVIDERS, getProviderById } from '../../shared/providers'
 import { Save, ArrowLeft, Eye, EyeOff } from 'lucide-react'
 
 const { ipcRenderer } = window.require('electron')
@@ -8,10 +9,11 @@ const { ipcRenderer } = window.require('electron')
 export default function Settings({ onBack }: { onBack?: () => void }) {
   const { settings, setSettings, setActiveView } = useStore()
   const [local, setLocal] = useState<AppSettings>({
+    providerId: 'minimax',
     apiKey: '',
     apiBase: 'https://api.minimaxi.com',
     groupId: '',
-    model: 'MiniMax-M2.5',
+    model: 'MiniMax-M2.7',
     systemPrompt: '',
     defaultTemplateId: null,
     exportFont: '宋体',
@@ -39,6 +41,22 @@ export default function Settings({ onBack }: { onBack?: () => void }) {
     setLocal({ ...local, [key]: value })
   }
 
+  const currentProvider = getProviderById(local.providerId)
+
+  const handleProviderChange = (providerId: string) => {
+    const provider = getProviderById(providerId)
+    if (provider) {
+      setLocal({
+        ...local,
+        providerId,
+        apiBase: provider.apiBase || local.apiBase,
+        model: provider.models[0]?.id || local.model,
+      })
+    } else {
+      setLocal({ ...local, providerId })
+    }
+  }
+
   return (
     <div className="max-w-2xl mx-auto p-6">
       <div className="flex items-center gap-3 mb-6">
@@ -54,7 +72,23 @@ export default function Settings({ onBack }: { onBack?: () => void }) {
       <div className="space-y-6">
         {/* API Settings */}
         <div className="bg-white rounded-lg border p-4 space-y-4">
-          <h2 className="font-semibold text-sm text-gray-700">MiniMax API</h2>
+          <h2 className="font-semibold text-sm text-gray-700">API 设置</h2>
+
+          {/* Provider selector */}
+          <div>
+            <label className="block text-sm text-gray-600 mb-1">服务商</label>
+            <select
+              value={local.providerId}
+              onChange={(e) => handleProviderChange(e.target.value)}
+              className="w-full border rounded px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+            >
+              {LLM_PROVIDERS.map(p => (
+                <option key={p.id} value={p.id}>{p.name}</option>
+              ))}
+            </select>
+          </div>
+
+          {/* API Key */}
           <div>
             <label className="block text-sm text-gray-600 mb-1">API Key</label>
             <div className="flex gap-2">
@@ -62,7 +96,7 @@ export default function Settings({ onBack }: { onBack?: () => void }) {
                 type={showKey ? 'text' : 'password'}
                 value={local.apiKey}
                 onChange={(e) => update('apiKey', e.target.value)}
-                placeholder="eyJh..."
+                placeholder="sk-..."
                 className="flex-1 border rounded px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
               />
               <button
@@ -72,44 +106,53 @@ export default function Settings({ onBack }: { onBack?: () => void }) {
                 {showKey ? <EyeOff size={16} /> : <Eye size={16} />}
               </button>
             </div>
-            <p className="text-xs text-gray-400 mt-1">
-              在 <a href="https://platform.minimax.io" className="text-blue-500 underline">platform.minimax.io</a> 获取 API Key
-            </p>
           </div>
-          <div>
-            <label className="block text-sm text-gray-600 mb-1">Group ID</label>
-            <input
-              value={local.groupId}
-              onChange={(e) => update('groupId', e.target.value)}
-              placeholder="在控制台基本信息页获取"
-              className="w-full border rounded px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
-            />
-          </div>
+
+          {/* Group ID - only for MiniMax */}
+          {currentProvider?.needsGroupId && (
+            <div>
+              <label className="block text-sm text-gray-600 mb-1">Group ID</label>
+              <input
+                value={local.groupId}
+                onChange={(e) => update('groupId', e.target.value)}
+                placeholder="在控制台基本信息页获取"
+                className="w-full border rounded px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+              />
+            </div>
+          )}
+
+          {/* API Base */}
           <div>
             <label className="block text-sm text-gray-600 mb-1">API 地址</label>
             <input
               value={local.apiBase}
               onChange={(e) => update('apiBase', e.target.value)}
-              placeholder="https://api.minimaxi.com"
+              placeholder="https://api.example.com"
               className="w-full border rounded px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
             />
-            <p className="text-xs text-gray-400 mt-1">
-              默认 https://api.minimaxi.com，也支持其他兼容 OpenAI 格式的 API
-            </p>
           </div>
+
+          {/* Model selector */}
           <div>
             <label className="block text-sm text-gray-600 mb-1">模型</label>
-            <select
-              value={local.model}
-              onChange={(e) => update('model', e.target.value)}
-              className="w-full border rounded px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
-            >
-              <option value="MiniMax-M2.5">MiniMax-M2.5 (推荐)</option>
-              <option value="MiniMax-M2.5-highspeed">MiniMax-M2.5-highspeed (快速)</option>
-              <option value="MiniMax-M2.1">MiniMax-M2.1</option>
-              <option value="MiniMax-M2.1-highspeed">MiniMax-M2.1-highspeed</option>
-              <option value="MiniMax-M2">MiniMax-M2</option>
-            </select>
+            {currentProvider && currentProvider.models.length > 0 ? (
+              <select
+                value={local.model}
+                onChange={(e) => update('model', e.target.value)}
+                className="w-full border rounded px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+              >
+                {currentProvider.models.map(m => (
+                  <option key={m.id} value={m.id}>{m.name}</option>
+                ))}
+              </select>
+            ) : (
+              <input
+                value={local.model}
+                onChange={(e) => update('model', e.target.value)}
+                placeholder="模型名称"
+                className="w-full border rounded px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+              />
+            )}
           </div>
         </div>
 
