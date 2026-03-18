@@ -112,7 +112,7 @@ function splitIntoChunks(text: string, chunkSize: number): string[] {
 
 export function registerIPC() {
   // ---- DOCX Export ----
-  ipcMain.handle(IPC.EXPORT_DOCX, async (_event, { paragraphs, footnotes, font, fontSize }) => {
+  ipcMain.handle(IPC.EXPORT_DOCX, async (_event, { paragraphs, footnotes, font, fontSize, mode }) => {
     const win = BrowserWindow.getFocusedWindow()
     const result = await dialog.showSaveDialog(win!, {
       title: '导出DOCX',
@@ -120,7 +120,7 @@ export function registerIPC() {
       filters: [{ name: 'Word文档', extensions: ['docx'] }],
     })
     if (result.canceled || !result.filePath) return { success: false }
-    await exportToDocx({ paragraphs, footnotes, font, fontSize }, result.filePath)
+    await exportToDocx({ paragraphs, footnotes, font, fontSize, mode }, result.filePath)
     return { success: true, path: result.filePath }
   })
 

@@ -43,6 +43,9 @@ export interface LLMProvider {
   needsGroupId?: boolean
 }
 
+// ---- Export modes ----
+export type ExportMode = 'footnote' | 'endnote' | 'bibliography'
+
 // ---- Chat ----
 export interface ChatMessage {
   role: 'user' | 'assistant'
