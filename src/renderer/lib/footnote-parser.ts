@@ -37,7 +37,7 @@ export function parseFootnotes(text: string): ParseResult {
   // Detect: bracket content is long (>15 chars) and contains Chinese characters
   let nextId = 1
   // Find the highest existing footnote number first, to avoid ID collisions
-  const existingIds = text.match(/\[\^?(\d+)\]/g)
+  const existingIds = text.match(/\[\^?(?:footnote|fn[-_]?)?(\d+)\]/g)
   if (existingIds) {
     for (const m of existingIds) {
       const n = parseInt(m.replace(/[\[\]^]/g, ''), 10)
@@ -56,6 +56,10 @@ export function parseFootnotes(text: string): ParseResult {
     footnotes.set(id, content.trim())
     return `[^${id}]`
   })
+
+  // === Phase 0.5: Normalize non-standard footnote markers ===
+  // Convert [^footnote0], [^fn_1], [^fn-2] etc. to [^N]
+  text = text.replace(/\[\^(?:footnote|fn[-_]?)(\d+)\]/g, '[^$1]')
 
   // === Phase 1: Collect endnote-style definitions (Format A & B) ===
   const lines = text.split('\n')
