@@ -1,5 +1,6 @@
 import { ipcMain, dialog, BrowserWindow } from 'electron'
 import { IPC } from '../shared/types'
+import { getProviderById } from '../shared/providers'
 import { exportToDocx } from './docx-export'
 import { extractTextFromFile } from './file-reader'
 import {
@@ -183,7 +184,7 @@ export function registerIPC() {
   ipcMain.handle(IPC.CHAT_SEND, async (_event, { messages, systemPrompt, references, templateFormat }) => {
     const settings = getSettings()
     if (!settings.apiKey) {
-      return { error: '请先在设置中配置 MiniMax API Key' }
+      return { error: '请先在设置中配置 API Key' }
     }
 
     // Build system prompt with references and template
@@ -212,12 +213,15 @@ export function registerIPC() {
       })),
     ]
 
-    const model = settings.model || 'MiniMax-M2.5'
-    const apiBase = settings.apiBase || 'https://api.minimaxi.com'
+    const provider = getProviderById(settings.providerId || 'minimax')
+    const model = settings.model || provider?.models[0]?.id || 'MiniMax-M2.7'
+    const apiBase = settings.apiBase || provider?.apiBase || 'https://api.minimaxi.com'
     const groupId = settings.groupId || ''
-    const apiPath = groupId
-      ? `/v1/text/chatcompletion_v2?GroupId=${groupId}`
-      : '/v1/text/chatcompletion_v2'
+    // Use provider's API path; append GroupId for MiniMax
+    let apiPath = provider?.apiPath || '/v1/chat/completions'
+    if (provider?.needsGroupId && groupId) {
+      apiPath += `?GroupId=${groupId}`
+    }
 
     const body = JSON.stringify({
       model,
