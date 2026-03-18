@@ -350,7 +350,7 @@ export default function App() {
           {/* API Key warning */}
           {!hasApiKey && (
             <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-4 text-sm text-yellow-800">
-              请先点击右上角设置，配置 MiniMax API Key
+              请先点击右上角设置，配置 API Key
             </div>
           )}
 
