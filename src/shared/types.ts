@@ -29,6 +29,8 @@ export interface FootnoteTemplate {
   format: string
   /** Whether this is a built-in preset */
   isPreset: boolean
+  /** Group name for categorizing templates (e.g. "法学引注手册", "GB/T 7714") */
+  group: string | null
 }
 
 // ---- LLM Providers ----

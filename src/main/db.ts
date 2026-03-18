@@ -129,7 +129,7 @@ export function getTemplates(): FootnoteTemplate[] {
 export function saveTemplate(tmpl: Omit<FootnoteTemplate, 'id' | 'isPreset'>): FootnoteTemplate {
   const stmt = db.prepare('INSERT INTO footnote_templates (name, format, is_preset) VALUES (?, ?, 0)')
   const info = stmt.run(tmpl.name, tmpl.format)
-  return { id: info.lastInsertRowid as number, name: tmpl.name, format: tmpl.format, isPreset: false }
+  return { id: info.lastInsertRowid as number, name: tmpl.name, format: tmpl.format, isPreset: false, group: tmpl.group ?? null }
 }
 
 export function deleteTemplate(id: number): void {

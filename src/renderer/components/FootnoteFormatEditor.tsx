@@ -1,9 +1,12 @@
-import React, { useEffect, useState, useCallback } from 'react'
+import React, { useEffect, useState, useCallback, useMemo } from 'react'
 import { useStore } from '../lib/store'
 import { IPC, FootnoteTemplate } from '../../shared/types'
 import { Plus, Trash2, Check, FileText } from 'lucide-react'
 
 const { ipcRenderer } = window.require('electron')
+
+/** Label used for user-created (non-preset) templates */
+const CUSTOM_GROUP = '自定义'
 
 export default function FootnoteFormatEditor() {
   const { templates, setTemplates, selectedTemplateId, setSelectedTemplateId } = useStore()
@@ -34,6 +37,35 @@ export default function FootnoteFormatEditor() {
     if (selectedTemplateId === id) setSelectedTemplateId(null)
   }, [setTemplates, selectedTemplateId, setSelectedTemplateId])
 
+  /**
+   * Build an ordered list of [groupName, templates[]] pairs.
+   * Preset groups appear first (in first-seen order), custom group last.
+   */
+  const groupedTemplates = useMemo(() => {
+    const presetGroups: Map<string, FootnoteTemplate[]> = new Map()
+    const customTemplates: FootnoteTemplate[] = []
+
+    for (const tmpl of templates) {
+      if (!tmpl.isPreset) {
+        customTemplates.push(tmpl)
+        continue
+      }
+      const groupName = tmpl.group || '其他'
+      if (!presetGroups.has(groupName)) {
+        presetGroups.set(groupName, [])
+      }
+      presetGroups.get(groupName)!.push(tmpl)
+    }
+
+    const result: [string, FootnoteTemplate[]][] = []
+    for (const [group, tmpls] of presetGroups) {
+      result.push([group, tmpls])
+    }
+    // Always show the custom group (even if empty, so "新建" appears there)
+    result.push([CUSTOM_GROUP, customTemplates])
+    return result
+  }, [templates])
+
   return (
     <div className="flex flex-col h-full">
       <div className="flex items-center justify-between px-3 py-2 border-b bg-white">
@@ -46,7 +78,7 @@ export default function FootnoteFormatEditor() {
         </button>
       </div>
 
-      <div className="flex-1 overflow-auto px-3 py-2 space-y-2">
+      <div className="flex-1 overflow-auto px-3 py-2 space-y-3">
         {/* Add new template form */}
         {showAdd && (
           <div className="p-3 bg-blue-50 rounded border border-blue-200 space-y-2">
@@ -79,37 +111,49 @@ export default function FootnoteFormatEditor() {
           </div>
         )}
 
-        {templates.map((tmpl) => (
-          <div
-            key={tmpl.id}
-            className={`flex items-start gap-2 p-2 rounded border cursor-pointer transition-colors ${
-              selectedTemplateId === tmpl.id
-                ? 'bg-blue-50 border-blue-300'
-                : 'bg-gray-50 hover:bg-gray-100'
-            }`}
-            onClick={() => setSelectedTemplateId(selectedTemplateId === tmpl.id ? null : tmpl.id)}
-          >
-            <div className="flex-1 min-w-0">
-              <div className="flex items-center gap-1">
-                <span className="text-sm font-medium">{tmpl.name}</span>
-                {tmpl.isPreset && (
-                  <span className="text-xs bg-gray-200 text-gray-500 px-1 rounded">预设</span>
-                )}
-                {selectedTemplateId === tmpl.id && (
-                  <Check size={14} className="text-blue-600" />
-                )}
-              </div>
-              <div className="text-xs text-gray-500 mt-0.5 break-all">{tmpl.format}</div>
+        {templates.length > 0 && groupedTemplates.map(([groupName, groupTmpls]) => (
+          <div key={groupName}>
+            {/* Group header */}
+            <div className="text-xs font-medium text-gray-400 uppercase tracking-wide mb-1 mt-1 px-1">
+              {groupName}
             </div>
-            {!tmpl.isPreset && (
-              <button
-                onClick={(e) => { e.stopPropagation(); handleDelete(tmpl.id) }}
-                className="p-1 text-gray-400 hover:text-red-500 shrink-0"
-                title="删除"
-              >
-                <Trash2 size={14} />
-              </button>
+
+            {groupTmpls.length === 0 && groupName === CUSTOM_GROUP && (
+              <div className="text-xs text-gray-400 px-1 py-1">暂无自定义模板</div>
             )}
+
+            <div className="space-y-1">
+              {groupTmpls.map((tmpl) => (
+                <div
+                  key={tmpl.id}
+                  className={`flex items-start gap-2 p-2 rounded border cursor-pointer transition-colors ${
+                    selectedTemplateId === tmpl.id
+                      ? 'bg-blue-50 border-blue-200'
+                      : 'bg-gray-50 hover:bg-gray-100 border-transparent'
+                  }`}
+                  onClick={() => setSelectedTemplateId(selectedTemplateId === tmpl.id ? null : tmpl.id)}
+                >
+                  <div className="flex-1 min-w-0">
+                    <div className="flex items-center gap-1">
+                      <span className="text-sm font-medium">{tmpl.name}</span>
+                      {selectedTemplateId === tmpl.id && (
+                        <Check size={14} className="text-blue-600" />
+                      )}
+                    </div>
+                    <div className="text-xs text-gray-500 mt-0.5 break-all line-clamp-1">{tmpl.format}</div>
+                  </div>
+                  {!tmpl.isPreset && (
+                    <button
+                      onClick={(e) => { e.stopPropagation(); handleDelete(tmpl.id) }}
+                      className="p-1 text-gray-400 hover:text-red-500 shrink-0"
+                      title="删除"
+                    >
+                      <Trash2 size={14} />
+                    </button>
+                  )}
+                </div>
+              ))}
+            </div>
           </div>
         ))}
       </div>
