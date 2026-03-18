@@ -266,13 +266,15 @@ export function registerIPC() {
                 } else if (json.error) {
                   resolve({ error: json.error.message || JSON.stringify(json.error) })
                 } else if (json.choices && json.choices[0]?.message) {
-                  // MiniMax M2.5 may put content in `content` or reasoning in `reasoning_content`
                   const msg = json.choices[0].message
-                  console.log('[MiniMax] content length:', (msg.content || '').length, 'reasoning_content length:', (msg.reasoning_content || '').length)
-                  console.log('[MiniMax] content preview:', (msg.content || '').slice(0, 200))
-                  console.log('[MiniMax] reasoning preview:', (msg.reasoning_content || '').slice(0, 200))
-                  const raw = msg.content || msg.reasoning_content || ''
-                  // Clean up garbled Unicode replacement characters from AI output
+                  let raw = msg.content || ''
+                  // Strip <think>...</think> blocks that some reasoning models embed in content
+                  raw = raw.replace(/<think>[\s\S]*?<\/think>/g, '').trim()
+                  if (!raw) {
+                    resolve({ error: '模型未返回有效内容（content 为空）' })
+                    return
+                  }
+                  // Clean up garbled Unicode replacement characters
                   const content = raw.replace(/\ufffd/g, '')
                   resolve({ content })
                 } else {

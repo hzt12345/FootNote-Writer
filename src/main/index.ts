@@ -18,12 +18,15 @@ function createWindow() {
     },
   })
 
-  // In development, load from Vite dev server; in production, load built files
-  if (process.env.NODE_ENV === 'development' || !app.isPackaged) {
+  // In development (with Vite dev server), load from localhost; otherwise load built files
+  if (process.env.VITE_DEV_SERVER === 'true') {
     mainWindow.loadURL('http://localhost:5173')
   } else {
     mainWindow.loadFile(path.join(__dirname, '../../renderer/index.html'))
   }
+
+  // Uncomment for debugging:
+  // mainWindow.webContents.openDevTools()
 
   mainWindow.on('closed', () => {
     mainWindow = null
