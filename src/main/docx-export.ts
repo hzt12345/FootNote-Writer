@@ -148,6 +148,27 @@ export async function exportToDocx(options: ExportOptions, savePath: string): Pr
     }
   }
 
+  // === Diagnostic logging for Windows debugging ===
+  console.log('[DOCX Export] Paragraphs:', options.paragraphs.length)
+  console.log('[DOCX Export] Footnotes:', Object.keys(footnotes).length, 'IDs:', Object.keys(footnotes).join(','))
+  for (const p of options.paragraphs) {
+    const markers = p.text.match(/\{\{FN:\d+\}\}/g)
+    if (markers) {
+      console.log('[DOCX Export] Paragraph has markers:', markers.join(', '), '| Text preview:', p.text.slice(0, 80))
+    }
+  }
+  // Check for unmatched markers
+  const definedIds = new Set(Object.keys(footnotes).map(Number))
+  for (const p of options.paragraphs) {
+    const markers = p.text.match(/\{\{FN:(\d+)\}\}/g) || []
+    for (const m of markers) {
+      const id = parseInt(m.replace(/\{\{FN:|}\}/g, ''), 10)
+      if (!definedIds.has(id)) {
+        console.warn('[DOCX Export] WARNING: Marker FN:', id, 'has no footnote definition!')
+      }
+    }
+  }
+
   const doc = new Document({
     footnotes,
     sections: [
