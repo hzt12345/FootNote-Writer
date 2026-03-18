@@ -6,6 +6,7 @@ files:
   - dist/**/*
   - node_modules/**/*
 mac:
+  icon: build/icons/icon.icns
   target:
     - dmg
   category: public.app-category.productivity
