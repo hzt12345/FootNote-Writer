@@ -31,6 +31,16 @@ export interface FootnoteTemplate {
   isPreset: boolean
 }
 
+// ---- LLM Providers ----
+export interface LLMProvider {
+  id: string
+  name: string
+  apiBase: string
+  apiPath: string
+  models: { id: string; name: string }[]
+  needsGroupId?: boolean
+}
+
 // ---- Chat ----
 export interface ChatMessage {
   role: 'user' | 'assistant'
@@ -39,6 +49,7 @@ export interface ChatMessage {
 
 // ---- Settings ----
 export interface AppSettings {
+  providerId: string
   apiKey: string
   apiBase: string
   groupId: string
