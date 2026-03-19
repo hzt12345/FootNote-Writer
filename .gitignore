@@ -6,3 +6,4 @@ release/
 .claude/
 .serena/
 CLAUDE.md
+test-e2e-footnote.mjs

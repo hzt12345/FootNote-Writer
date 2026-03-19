@@ -7,6 +7,7 @@ export const LLM_PROVIDERS: LLMProvider[] = [
     apiBase: 'https://api.minimaxi.com',
     apiPath: '/v1/chat/completions',
     needsGroupId: true,
+    maxTokens: 16384,
     models: [
       { id: 'MiniMax-M2.7', name: 'MiniMax-M2.7 (推荐)' },
       { id: 'MiniMax-M2.7-highspeed', name: 'MiniMax-M2.7-highspeed (快速)' },
@@ -19,8 +20,9 @@ export const LLM_PROVIDERS: LLMProvider[] = [
     name: 'DeepSeek',
     apiBase: 'https://api.deepseek.com',
     apiPath: '/v1/chat/completions',
+    maxTokens: 8192,
     models: [
-      { id: 'deepseek-chat', name: 'DeepSeek-V3 (推荐)' },
+      { id: 'deepseek-chat', name: 'DeepSeek-V3.2 (推荐)' },
       { id: 'deepseek-reasoner', name: 'DeepSeek-R1 (推理)' },
     ],
   },
@@ -29,10 +31,13 @@ export const LLM_PROVIDERS: LLMProvider[] = [
     name: '月之暗面 (Kimi)',
     apiBase: 'https://api.moonshot.cn',
     apiPath: '/v1/chat/completions',
+    maxTokens: 4096,
+    noTemperature: true,
     models: [
       { id: 'kimi-k2.5', name: 'Kimi K2.5 (推荐)' },
+      { id: 'kimi-k2', name: 'Kimi K2' },
       { id: 'kimi-latest', name: 'Kimi Latest' },
-      { id: 'moonshot-v1-128k', name: 'Moonshot-v1-128k' },
+      { id: 'moonshot-v1-128k', name: 'Moonshot-v1-128k (旧版)' },
     ],
   },
   {
@@ -40,10 +45,12 @@ export const LLM_PROVIDERS: LLMProvider[] = [
     name: '通义千问',
     apiBase: 'https://dashscope.aliyuncs.com',
     apiPath: '/compatible-mode/v1/chat/completions',
+    maxTokens: 8192,
     models: [
       { id: 'qwen3-max', name: 'Qwen3-Max (推荐)' },
       { id: 'qwen3.5-plus', name: 'Qwen3.5-Plus' },
-      { id: 'qwen-plus', name: 'Qwen-Plus' },
+      { id: 'qwen3.5-flash', name: 'Qwen3.5-Flash (经济)' },
+      { id: 'qwen-plus', name: 'Qwen-Plus (旧版)' },
     ],
   },
   {
@@ -51,6 +58,7 @@ export const LLM_PROVIDERS: LLMProvider[] = [
     name: 'OpenAI',
     apiBase: 'https://api.openai.com',
     apiPath: '/v1/chat/completions',
+    maxTokens: 16384,
     models: [
       { id: 'gpt-5.4', name: 'GPT-5.4 (推荐)' },
       { id: 'gpt-5.4-mini', name: 'GPT-5.4-mini' },

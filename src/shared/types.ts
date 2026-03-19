@@ -41,6 +41,10 @@ export interface LLMProvider {
   apiPath: string
   models: { id: string; name: string }[]
   needsGroupId?: boolean
+  /** Max output tokens supported by this provider (default 4096) */
+  maxTokens?: number
+  /** Whether to omit temperature from request (some models only accept temperature=1) */
+  noTemperature?: boolean
 }
 
 // ---- Export modes ----

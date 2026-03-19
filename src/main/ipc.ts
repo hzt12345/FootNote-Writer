@@ -230,12 +230,14 @@ export function registerIPC() {
       apiPath += `?GroupId=${groupId}`
     }
 
-    const body = JSON.stringify({
+    const requestBody: Record<string, unknown> = {
       model,
       messages: apiMessages,
-      max_tokens: 16384,
-      temperature: 0.3,
-    })
+    }
+    if (!provider?.noTemperature) {
+      requestBody.temperature = 0.3
+    }
+    const body = JSON.stringify(requestBody)
 
     try {
       const result = await new Promise<{ content?: string; error?: string }>((resolve) => {
