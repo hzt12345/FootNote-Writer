@@ -119,15 +119,24 @@ jobs:
           shopt -s globstar nullglob
           for file in artifacts/**/*.exe artifacts/**/*.dmg artifacts/**/*.zip; do
             [ -f "$file" ] || continue
+            UPLOAD_FILE="$file"
             FILE_SIZE=$(stat --printf="%s" "$file" 2>/dev/null || stat -f%z "$file")
+            # Compress files >100MB to fit Gitee's limit
             if [ "$FILE_SIZE" -gt 104857600 ]; then
-              echo "Skipping $file ($(( FILE_SIZE / 1048576 ))MB > 100MB Gitee limit)"
-              continue
+              echo "Compressing $file ($(( FILE_SIZE / 1048576 ))MB) to fit Gitee 100MB limit..."
+              UPLOAD_FILE="${file}.zip"
+              zip -j "$UPLOAD_FILE" "$file"
+              FILE_SIZE=$(stat --printf="%s" "$UPLOAD_FILE" 2>/dev/null || stat -f%z "$UPLOAD_FILE")
+              if [ "$FILE_SIZE" -gt 104857600 ]; then
+                echo "Still too large after compression, skipping"
+                rm -f "$UPLOAD_FILE"
+                continue
+              fi
             fi
-            echo "Uploading $file ($(( FILE_SIZE / 1048576 ))MB)..."
+            echo "Uploading $UPLOAD_FILE ($(( FILE_SIZE / 1048576 ))MB)..."
             curl -s -X POST \
               "https://gitee.com/api/v5/repos/${{ secrets.GITEE_OWNER }}/${{ secrets.GITEE_REPO }}/releases/${{ steps.create_release.outputs.RELEASE_ID }}/attach_files" \
               -H "Content-Type: multipart/form-data" \
               -F "access_token=${{ secrets.GITEE_TOKEN }}" \
-              -F "file=@$file"
+              -F "file=@$UPLOAD_FILE"
           done
