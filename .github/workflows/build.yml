@@ -102,6 +102,7 @@ jobs:
               \"access_token\": \"${{ secrets.GITEE_TOKEN }}\",
               \"tag_name\": \"${{ steps.tag.outputs.TAG }}\",
               \"name\": \"${{ steps.tag.outputs.TAG }}\",
+              \"target_commitish\": \"main\",
               \"body\": \"See GitHub Release for details.\"
             }")
           RELEASE_ID=$(echo "$RESPONSE" | jq -r '.id')
@@ -118,7 +119,12 @@ jobs:
           shopt -s globstar nullglob
           for file in artifacts/**/*.exe artifacts/**/*.dmg artifacts/**/*.zip; do
             [ -f "$file" ] || continue
-            echo "Uploading $file..."
+            FILE_SIZE=$(stat --printf="%s" "$file" 2>/dev/null || stat -f%z "$file")
+            if [ "$FILE_SIZE" -gt 104857600 ]; then
+              echo "Skipping $file ($(( FILE_SIZE / 1048576 ))MB > 100MB Gitee limit)"
+              continue
+            fi
+            echo "Uploading $file ($(( FILE_SIZE / 1048576 ))MB)..."
             curl -s -X POST \
               "https://gitee.com/api/v5/repos/${{ secrets.GITEE_OWNER }}/${{ secrets.GITEE_REPO }}/releases/${{ steps.create_release.outputs.RELEASE_ID }}/attach_files" \
               -H "Content-Type: multipart/form-data" \
