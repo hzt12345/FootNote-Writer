@@ -8,7 +8,7 @@ import { IPC, Reference } from '../shared/types'
 import {
   Settings as SettingsIcon,
   FileUp, BookOpen, Sparkles, Download,
-  Loader2, X, ArrowLeft, Trash2,
+  Loader2, X, ArrowLeft, Trash2, Copy,
 } from 'lucide-react'
 
 const { ipcRenderer } = window.require('electron')
@@ -162,6 +162,7 @@ export default function App() {
   const [footnotes, setFootnotes] = useState<Map<number, string>>(new Map())
   const [loading, setLoading] = useState(false)
   const [status, setStatus] = useState('')
+  const [statusIsError, setStatusIsError] = useState(false)
   const [exportMode, setExportMode] = useState<'footnote' | 'endnote' | 'bibliography'>('footnote')
 
   // Load settings, references, templates on mount
@@ -182,6 +183,7 @@ export default function App() {
     setResultText('')
     setFootnotes(new Map())
     setStatus(`已导入正文: ${files[0].title}`)
+    setStatusIsError(false)
   }, [])
 
   // ===== Step 2: 上传参考文献 =====
@@ -199,6 +201,7 @@ export default function App() {
     const fresh = await ipcRenderer.invoke(IPC.GET_REFERENCES)
     setReferences(fresh)
     setStatus(`已添加 ${files.length} 篇参考文献，共 ${fresh.length} 篇`)
+    setStatusIsError(false)
   }, [setReferences])
 
   // Delete a reference
@@ -236,7 +239,8 @@ export default function App() {
     setLoading(false)
 
     if (result.error) {
-      setStatus(`错误: ${result.error}`)
+      setStatus(result.error)
+      setStatusIsError(true)
     } else if (result.content) {
       const parsed = parseFootnotes(result.content)
       // Convert body with markers back to display text
@@ -253,6 +257,7 @@ export default function App() {
         // Exact match after normalization — no modification
         finalBody = aiBody
         setStatus(`完成！生成了 ${parsed.footnotes.size} 个脚注，原文内容未被修改 ✓`)
+        setStatusIsError(false)
       } else {
         // There are diffs — compute them and ask LLM if they are substantial
         const diffs = computeTextDiffs(originalPlain, aiPlain)
@@ -261,6 +266,7 @@ export default function App() {
           // Only trivial whitespace diffs
           finalBody = aiBody
           setStatus(`完成！生成了 ${parsed.footnotes.size} 个脚注，原文内容未被修改 ✓`)
+          setStatusIsError(false)
         } else {
           // Ask LLM: are these diffs substantial modifications?
           setStatus(`检测到 ${diffs.length} 处差异，正在用 AI 判断是否为实质性修改...`)
@@ -278,10 +284,12 @@ export default function App() {
             // Substantial modification — graft markers onto original
             finalBody = graftFootnotesOntoOriginal(originalPlain, aiBody)
             setStatus(`完成！生成了 ${parsed.footnotes.size} 个脚注（检测到实质性修改，已自动恢复原文）`)
+            setStatusIsError(false)
           } else {
             // Non-substantial — use AI output as-is
             finalBody = aiBody
             setStatus(`完成！生成了 ${parsed.footnotes.size} 个脚注（差异为非实质性修改，已采纳）`)
+            setStatusIsError(false)
           }
         }
       }
@@ -322,6 +330,7 @@ export default function App() {
 
     if (result.success) {
       setStatus(`导出成功: ${result.path}`)
+      setStatusIsError(false)
     }
   }, [resultText, bodyText, footnotes, settings, exportMode])
 
@@ -469,7 +478,26 @@ export default function App() {
 
           {/* Status bar */}
           {status && (
-            <div className="text-center text-sm text-gray-500 py-2">{status}</div>
+            <div className={`text-center text-sm py-2 flex items-center justify-center gap-2 ${statusIsError ? 'text-red-600' : 'text-gray-500'}`}>
+              <span>{status}</span>
+              {statusIsError && (
+                <button
+                  onClick={() => {
+                    const info = [
+                      `错误: ${status}`,
+                      `App: FootNote Writer`,
+                      `OS: ${navigator.platform}`,
+                      `Time: ${new Date().toISOString()}`,
+                    ].join('\n')
+                    navigator.clipboard.writeText(info)
+                  }}
+                  className="text-xs px-2 py-0.5 bg-red-50 border border-red-200 rounded hover:bg-red-100 text-red-600 shrink-0"
+                >
+                  <Copy size={12} className="inline mr-1" />
+                  复制错误详情
+                </button>
+              )}
+            </div>
           )}
         </div>
       </div>
