@@ -93,4 +93,6 @@ export const IPC = {
   // File dialog
   OPEN_FILE_DIALOG: 'open-file-dialog',
   SAVE_FILE_DIALOG: 'save-file-dialog',
+  // Diagnostics
+  LOG_EXPORT: 'log-export',
 } as const
