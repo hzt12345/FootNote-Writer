@@ -22,6 +22,20 @@ export default function Settings({ onBack }: { onBack?: () => void }) {
   })
   const [showKey, setShowKey] = useState(false)
   const [saved, setSaved] = useState(false)
+  const [exporting, setExporting] = useState(false)
+
+  const handleExportLog = async () => {
+    setExporting(true)
+    try {
+      const result = await ipcRenderer.invoke(IPC.LOG_EXPORT)
+      if (result.success) {
+        alert(`日志已导出到: ${result.path}`)
+      }
+    } catch (err) {
+      alert('导出失败')
+    }
+    setExporting(false)
+  }
 
   useEffect(() => {
     ipcRenderer.invoke(IPC.GET_SETTINGS).then((s: AppSettings) => {
@@ -216,6 +230,21 @@ export default function Settings({ onBack }: { onBack?: () => void }) {
           <Save size={16} />
           {saved ? '已保存' : '保存设置'}
         </button>
+
+        {/* Diagnostics */}
+        <div className="bg-white rounded-lg border p-4 space-y-4">
+          <h2 className="font-semibold text-sm text-gray-700">诊断</h2>
+          <button
+            onClick={handleExportLog}
+            disabled={exporting}
+            className="flex items-center gap-2 px-4 py-2 border rounded-lg hover:bg-gray-50 text-sm text-gray-600"
+          >
+            {exporting ? '导出中...' : '导出诊断日志'}
+          </button>
+          <p className="text-xs text-gray-400">
+            导出应用日志，用于排查问题。不包含正文内容和完整 API Key。
+          </p>
+        </div>
       </div>
     </div>
   )
