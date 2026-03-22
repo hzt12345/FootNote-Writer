@@ -1,4 +1,4 @@
-import { ipcMain, dialog, BrowserWindow } from 'electron'
+import { ipcMain, dialog, BrowserWindow, app } from 'electron'
 import { IPC } from '../shared/types'
 import { getProviderById } from '../shared/providers'
 import { exportToDocx } from './docx-export'
@@ -11,6 +11,10 @@ import {
 import { getCitationPrompt } from '../shared/citation-prompts'
 import https from 'https'
 import http from 'http'
+import fs from 'fs'
+import os from 'os'
+import { logger } from './logger'
+import { mapErrorToUserMessage } from './error-mapping'
 
 /**
  * Simple keyword-based retrieval: split references into chunks,
@@ -122,11 +126,13 @@ export function registerIPC() {
     })
     if (result.canceled || !result.filePath) return { success: false }
     await exportToDocx({ paragraphs, footnotes, font, fontSize, mode }, result.filePath)
+    logger.info('file', `DOCX export mode=${mode} success`)
     return { success: true, path: result.filePath }
   })
 
   // ---- File reading ----
   ipcMain.handle(IPC.READ_FILE, async (_event, filePath: string) => {
+    logger.info('file', `Read file: ${filePath}`)
     return extractTextFromFile(filePath)
   })
 
@@ -178,7 +184,42 @@ export function registerIPC() {
 
   ipcMain.handle(IPC.SAVE_SETTINGS, async (_event, settings) => {
     saveSettings(settings)
+    logger.info('settings', `Settings saved provider=${settings.providerId || '?'} model=${settings.model || '?'}`)
     return { success: true }
+  })
+
+  // ---- Log Export ----
+  ipcMain.handle(IPC.LOG_EXPORT, async () => {
+    const win = BrowserWindow.getFocusedWindow()
+    if (!win) return { success: false }
+    const result = await dialog.showSaveDialog(win, {
+      title: '导出诊断日志',
+      defaultPath: `footnote-writer-log-${new Date().toISOString().slice(0, 10)}.txt`,
+      filters: [{ name: '文本文件', extensions: ['txt'] }],
+    })
+    if (result.canceled || !result.filePath) return { success: false }
+
+    const settings = getSettings()
+    const maskedKey = settings.apiKey
+      ? settings.apiKey.slice(0, 4) + '****'
+      : '(未设置)'
+
+    const header = [
+      'FootNote Writer 诊断日志',
+      `导出时间: ${new Date().toISOString()}`,
+      `App 版本: ${app.getVersion()}`,
+      `Electron: ${process.versions.electron}`,
+      `OS: ${process.platform} ${process.arch} ${os.release()}`,
+      `Provider: ${settings.providerId}`,
+      `Model: ${settings.model}`,
+      `API Key: ${maskedKey}`,
+      '---',
+      '',
+    ].join('\n')
+
+    const logContent = logger.getLogContent()
+    fs.writeFileSync(result.filePath, header + logContent)
+    return { success: true, path: result.filePath }
   })
 
   // ---- MiniMax API Chat ----
@@ -239,6 +280,8 @@ export function registerIPC() {
     }
     const body = JSON.stringify(requestBody)
 
+    logger.info('api', `Request to ${settings.providerId}/${model} msgCount=${messages.length}`)
+
     try {
       const result = await new Promise<{ content?: string; error?: string }>((resolve) => {
         const url = new URL(apiPath, apiBase)
@@ -251,6 +294,7 @@ export function registerIPC() {
             port: url.port || (isHttps ? 443 : 80),
             path: url.pathname + url.search,
             method: 'POST',
+            timeout: 30000,
             headers: {
               'Content-Type': 'application/json',
               'Authorization': `Bearer ${settings.apiKey}`,
@@ -260,37 +304,76 @@ export function registerIPC() {
             let data = ''
             res.on('data', (chunk: Buffer) => { data += chunk.toString() })
             res.on('end', () => {
+              const statusCode = res.statusCode || 0
+              logger.info('api', `Response status=${statusCode} bytes=${data.length}`)
+
+              // Check HTTP status before JSON parsing
+              if (statusCode >= 400) {
+                const rawError = `HTTP ${statusCode}: ${data.slice(0, 300)}`
+                const mapped = mapErrorToUserMessage(rawError, statusCode, settings.providerId)
+                logger.error('api', `HTTP error: ${rawError}`)
+                resolve({ error: mapped.userMessage })
+                return
+              }
+
               try {
                 const json = JSON.parse(data)
                 // Check for MiniMax error format
                 if (json.base_resp && json.base_resp.status_code !== 0) {
-                  resolve({ error: `MiniMax错误(${json.base_resp.status_code}): ${json.base_resp.status_msg}` })
+                  const rawError = `MiniMax错误(${json.base_resp.status_code}): ${json.base_resp.status_msg}`
+                  const mapped = mapErrorToUserMessage(rawError, statusCode, settings.providerId)
+                  logger.error('api', rawError)
+                  resolve({ error: mapped.userMessage })
                 } else if (json.error) {
-                  resolve({ error: json.error.message || JSON.stringify(json.error) })
+                  const rawError = json.error.message || JSON.stringify(json.error)
+                  const mapped = mapErrorToUserMessage(rawError, statusCode, settings.providerId)
+                  logger.error('api', `API error: ${rawError}`)
+                  resolve({ error: mapped.userMessage })
                 } else if (json.choices && json.choices[0]?.message) {
                   const msg = json.choices[0].message
                   let raw = msg.content || ''
                   // Strip <think>...</think> blocks that some reasoning models embed in content
                   raw = raw.replace(/<think>[\s\S]*?<\/think>/g, '').trim()
                   if (!raw) {
-                    resolve({ error: '模型未返回有效内容（content 为空）' })
+                    const rawError = '模型未返回有效内容（content 为空）'
+                    const mapped = mapErrorToUserMessage(rawError)
+                    logger.error('api', rawError)
+                    resolve({ error: mapped.userMessage })
                     return
                   }
                   // Clean up garbled Unicode replacement characters
                   const content = raw.replace(/\ufffd/g, '')
+                  logger.info('api', `Success contentLength=${content.length}`)
                   resolve({ content })
                 } else {
-                  resolve({ error: `意外的响应格式: ${data.slice(0, 300)}` })
+                  const rawError = `意外的响应格式: ${data.slice(0, 300)}`
+                  const mapped = mapErrorToUserMessage(rawError)
+                  logger.error('api', rawError)
+                  resolve({ error: mapped.userMessage })
                 }
               } catch {
-                resolve({ error: `解析响应失败: ${data.slice(0, 300)}` })
+                const rawError = `解析响应失败: ${data.slice(0, 300)}`
+                const mapped = mapErrorToUserMessage(rawError)
+                logger.error('api', rawError)
+                resolve({ error: mapped.userMessage })
               }
             })
           },
         )
 
         req.on('error', (err: Error) => {
-          resolve({ error: `请求失败: ${err.message}` })
+          const rawError = `请求失败: ${err.message}`
+          const mapped = mapErrorToUserMessage(rawError)
+          logger.error('api', rawError)
+          resolve({ error: mapped.userMessage })
+        })
+
+        req.on('timeout', () => {
+          const rawError = '请求超时（30秒无响应）'
+          const mapped = mapErrorToUserMessage(rawError)
+          logger.error('api', rawError)
+          req.destroy()
+          resolve({ error: mapped.userMessage })
         })
 
         req.write(body)
@@ -299,7 +382,10 @@ export function registerIPC() {
 
       return result
     } catch (err: any) {
-      return { error: err.message || '调用MiniMax API失败' }
+      const rawError = err.message || '调用API失败'
+      const mapped = mapErrorToUserMessage(rawError)
+      logger.error('api', rawError)
+      return { error: mapped.userMessage }
     }
   })
 }
