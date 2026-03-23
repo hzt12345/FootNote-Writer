@@ -19,6 +19,7 @@ export default function Settings({ onBack }: { onBack?: () => void }) {
     exportFont: '宋体',
     exportFontSize: 12,
     maxRefChars: 30000,
+    requestTimeout: 0,
   })
   const [showKey, setShowKey] = useState(false)
   const [saved, setSaved] = useState(false)
@@ -218,6 +219,23 @@ export default function Settings({ onBack }: { onBack?: () => void }) {
             />
             <p className="text-xs text-gray-400 mt-1">
               发送给AI的参考文献总字符上限，默认30000。文献太大会被截断。
+            </p>
+          </div>
+        </div>
+
+        {/* Advanced settings */}
+        <div className="bg-white rounded-lg border p-4 space-y-4">
+          <h2 className="font-semibold text-sm text-gray-700">高级设置</h2>
+          <div>
+            <label className="block text-sm text-gray-600 mb-1">请求超时（秒）</label>
+            <input
+              type="number"
+              value={local.requestTimeout}
+              onChange={(e) => update('requestTimeout', parseInt(e.target.value) || 0)}
+              className="w-full border rounded px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+            />
+            <p className="text-xs text-gray-400 mt-1">
+              API 请求的超时时间。设为 0 表示不限制（默认）。长文本建议不限制。
             </p>
           </div>
         </div>

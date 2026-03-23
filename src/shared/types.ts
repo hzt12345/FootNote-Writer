@@ -69,6 +69,8 @@ export interface AppSettings {
   exportFontSize: number
   /** Max total reference chars sent to AI (default 30000) */
   maxRefChars: number
+  /** API request timeout in seconds, 0 = no timeout (default 0) */
+  requestTimeout: number
 }
 
 // ---- IPC channel names ----

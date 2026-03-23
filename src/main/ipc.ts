@@ -298,6 +298,7 @@ export function registerIPC() {
               'Content-Type': 'application/json',
               'Authorization': `Bearer ${settings.apiKey}`,
             },
+            ...(settings.requestTimeout > 0 ? { timeout: settings.requestTimeout * 1000 } : {}),
           },
           (res) => {
             let data = ''
@@ -359,6 +360,14 @@ export function registerIPC() {
             })
           },
         )
+
+        req.on('timeout', () => {
+          req.destroy()
+          const rawError = `请求超时（${settings.requestTimeout}秒无响应）`
+          const mapped = mapErrorToUserMessage(rawError)
+          logger.error('api', rawError)
+          resolve({ error: mapped.userMessage })
+        })
 
         req.on('error', (err: Error) => {
           const rawError = `请求失败: ${err.message}`
