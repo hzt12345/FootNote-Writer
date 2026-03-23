@@ -119,13 +119,24 @@ function callAPI(provider) {
   })
 }
 
+async function callWithRetry(provider, retries = 1) {
+  const result = await callAPI(provider)
+  if (result.status === 'FAIL' && retries > 0 && result.message.includes('overloaded')) {
+    console.log(`RETRY (server overloaded, waiting 5s)...`)
+    await new Promise(r => setTimeout(r, 5000))
+    process.stdout.write(`  Retrying ${provider.name}... `)
+    return callWithRetry(provider, retries - 1)
+  }
+  return result
+}
+
 async function main() {
   console.log('=== FootNote Writer API Smoke Test ===\n')
 
   const results = []
   for (const provider of PROVIDERS) {
     process.stdout.write(`Testing ${provider.name}... `)
-    const result = await callAPI(provider)
+    const result = await callWithRetry(provider)
     console.log(`${result.status} ${result.message}`)
     results.push(result)
   }
