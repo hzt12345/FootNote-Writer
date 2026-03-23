@@ -46,21 +46,36 @@ describe('mapErrorToUserMessage', () => {
 
   it('ECONNREFUSED → network guidance', () => {
     const result = mapErrorToUserMessage('请求失败: connect ECONNREFUSED 127.0.0.1:443')
-    expect(result.userMessage).toContain('无法连接到 API 服务器')
+    expect(result.userMessage).toContain('网络连接失败')
   })
 
   it('ETIMEDOUT → network guidance', () => {
     const result = mapErrorToUserMessage('请求失败: connect ETIMEDOUT')
-    expect(result.userMessage).toContain('无法连接到 API 服务器')
+    expect(result.userMessage).toContain('网络连接失败')
   })
 
   it('ENOTFOUND → network guidance', () => {
     const result = mapErrorToUserMessage('请求失败: getaddrinfo ENOTFOUND api.example.com')
-    expect(result.userMessage).toContain('无法连接到 API 服务器')
+    expect(result.userMessage).toContain('网络连接失败')
   })
 
-  it('request timeout → timeout message', () => {
-    const result = mapErrorToUserMessage('请求超时')
+  it('ECONNRESET → network guidance', () => {
+    const result = mapErrorToUserMessage('请求失败: read ECONNRESET')
+    expect(result.userMessage).toContain('网络连接失败')
+  })
+
+  it('socket hang up → network guidance', () => {
+    const result = mapErrorToUserMessage('请求失败: socket hang up')
+    expect(result.userMessage).toContain('网络连接失败')
+  })
+
+  it('connect timeout → network guidance', () => {
+    const result = mapErrorToUserMessage('请求失败: connect timeout')
+    expect(result.userMessage).toContain('网络连接失败')
+  })
+
+  it('our timeout → pass through', () => {
+    const result = mapErrorToUserMessage('请求超时（60秒无响应）')
     expect(result.userMessage).toContain('请求超时')
   })
 

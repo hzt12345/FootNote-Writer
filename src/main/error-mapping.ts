@@ -37,13 +37,14 @@ export function mapErrorToUserMessage(
   }
 
   // 3. Network errors
-  if (rawError.includes('ECONNREFUSED') || rawError.includes('ETIMEDOUT') || rawError.includes('ENOTFOUND')) {
-    return { userMessage: '无法连接到 API 服务器，请检查网络连接或 API 地址是否正确', rawError }
+  if (rawError.includes('ECONNREFUSED') || rawError.includes('ETIMEDOUT') || rawError.includes('ENOTFOUND') ||
+      rawError.includes('ECONNRESET') || rawError.includes('socket hang up') || rawError.includes('timeout')) {
+    return { userMessage: '网络连接失败，请检查：1) 网络是否通畅 2) 是否使用了代理/VPN 3) API 地址是否正确', rawError }
   }
 
-  // 4. Timeout
-  if (rawError.includes('请求超时') || rawError.includes('timeout')) {
-    return { userMessage: '请求超时，请检查网络连接或稍后重试', rawError }
+  // 4. Our own timeout (from requestTimeout setting)
+  if (rawError.includes('请求超时')) {
+    return { userMessage: rawError, rawError }
   }
 
   // 5. Empty content
