@@ -294,7 +294,6 @@ export function registerIPC() {
             port: url.port || (isHttps ? 443 : 80),
             path: url.pathname + url.search,
             method: 'POST',
-            timeout: 30000,
             headers: {
               'Content-Type': 'application/json',
               'Authorization': `Bearer ${settings.apiKey}`,
@@ -368,13 +367,6 @@ export function registerIPC() {
           resolve({ error: mapped.userMessage })
         })
 
-        req.on('timeout', () => {
-          const rawError = '请求超时（30秒无响应）'
-          const mapped = mapErrorToUserMessage(rawError)
-          logger.error('api', rawError)
-          req.destroy()
-          resolve({ error: mapped.userMessage })
-        })
 
         req.write(body)
         req.end()
