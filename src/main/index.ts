@@ -54,25 +54,25 @@ app.whenReady().then(async () => {
       app.exit(1)
     }, 15000)
 
-    mainWindow.webContents.on('did-finish-load', async () => {
+    // Poll for React render — did-finish-load fires before JS bundle executes
+    const checkReact = async () => {
       try {
         const hasContent = await mainWindow!.webContents.executeJavaScript(
-          'document.getElementById("root").children.length > 0'
+          'document.getElementById("root") && document.getElementById("root").children.length > 0'
         )
         if (hasContent) {
           console.log('Smoke test PASSED: renderer loaded, React rendered')
           clearTimeout(timeout)
           app.exit(0)
         } else {
-          console.error('Smoke test FAILED: root element has no children')
-          clearTimeout(timeout)
-          app.exit(1)
+          setTimeout(checkReact, 500)
         }
-      } catch (err) {
-        console.error('Smoke test FAILED:', err)
-        clearTimeout(timeout)
-        app.exit(1)
+      } catch {
+        setTimeout(checkReact, 500)
       }
+    }
+    mainWindow.webContents.on('did-finish-load', () => {
+      setTimeout(checkReact, 1000)
     })
   } else {
     app.on('activate', () => {
