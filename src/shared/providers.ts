@@ -15,18 +15,7 @@ export const LLM_PROVIDERS: LLMProvider[] = [
       { id: 'MiniMax-M2.5-highspeed', name: 'MiniMax-M2.5-highspeed' },
     ],
   },
-  {
-    id: 'deepseek',
-    name: 'DeepSeek',
-    apiBase: 'https://api.deepseek.com',
-    apiPath: '/v1/chat/completions',
-    maxTokens: 8192,
-    models: [
-      { id: 'deepseek-chat', name: 'DeepSeek-V3.2 (推荐)' },
-      { id: 'deepseek-reasoner', name: 'DeepSeek-R1 (推理)' },
-    ],
-  },
-  {
+{
     id: 'kimi',
     name: '月之暗面 (Kimi)',
     apiBase: 'https://api.moonshot.cn',

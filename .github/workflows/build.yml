@@ -125,7 +125,6 @@ jobs:
 
           api = HfApi(token=os.environ["HF_TOKEN"])
           repo_id = "zth07/FootNote-Writer"
-          tag = os.environ.get("TAG", "latest")
 
           # Create repo if not exists
           try:
@@ -133,17 +132,30 @@ jobs:
           except Exception as e:
               print(f"Repo creation: {e}")
 
-          # Upload all release files
+          # Delete old files in latest/ first
+          try:
+              files = api.list_repo_files(repo_id=repo_id, repo_type="model")
+              old_files = [f for f in files if f.startswith("latest/")]
+              if old_files:
+                  operations = [{"path": f} for f in old_files]
+                  from huggingface_hub import CommitOperationDelete
+                  ops = [CommitOperationDelete(path_in_repo=f) for f in old_files]
+                  api.create_commit(repo_id=repo_id, repo_type="model", operations=ops, commit_message="Clean old release files")
+                  print(f"Cleaned {len(old_files)} old files")
+          except Exception as e:
+              print(f"Cleanup: {e}")
+
+          # Upload all release files to latest/
           for pattern in ["artifacts/**/*.exe", "artifacts/**/*.dmg", "artifacts/**/*.zip"]:
               for filepath in glob.glob(pattern, recursive=True):
                   filename = os.path.basename(filepath)
                   print(f"Uploading {filename} ({os.path.getsize(filepath) // 1048576}MB)...")
                   api.upload_file(
                       path_or_fileobj=filepath,
-                      path_in_repo=f"{tag}/{filename}",
+                      path_in_repo=f"latest/{filename}",
                       repo_id=repo_id,
                       repo_type="model",
-                      commit_message=f"Release {tag}: {filename}",
+                      commit_message=f"Release latest: {filename}",
                   )
-                  print(f"Done: https://huggingface.co/{repo_id}/resolve/main/{tag}/{filename}")
+                  print(f"Done: https://huggingface.co/{repo_id}/resolve/main/latest/{filename}")
           PYEOF

@@ -12,13 +12,6 @@ import https from 'https'
 
 const PROVIDERS = [
   {
-    name: 'DeepSeek',
-    envKey: 'DEEPSEEK_API_KEY',
-    apiBase: 'api.deepseek.com',
-    apiPath: '/v1/chat/completions',
-    model: 'deepseek-chat',
-  },
-  {
     name: '通义千问',
     envKey: 'QWEN_API_KEY',
     apiBase: 'dashscope.aliyuncs.com',

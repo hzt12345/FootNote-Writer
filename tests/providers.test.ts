@@ -2,14 +2,13 @@ import { describe, it, expect } from 'vitest'
 import { LLM_PROVIDERS, getProviderById } from '../src/shared/providers'
 
 describe('LLM_PROVIDERS', () => {
-  it('should have 6 providers', () => {
-    expect(LLM_PROVIDERS).toHaveLength(6)
+  it('should have 5 providers', () => {
+    expect(LLM_PROVIDERS).toHaveLength(5)
   })
 
   it('should include all expected provider IDs', () => {
     const ids = LLM_PROVIDERS.map(p => p.id)
     expect(ids).toContain('minimax')
-    expect(ids).toContain('deepseek')
     expect(ids).toContain('kimi')
     expect(ids).toContain('qwen')
     expect(ids).toContain('openai')
@@ -62,9 +61,9 @@ describe('LLM_PROVIDERS', () => {
 
 describe('getProviderById', () => {
   it('should return provider for valid ID', () => {
-    const provider = getProviderById('deepseek')
+    const provider = getProviderById('qwen')
     expect(provider).toBeDefined()
-    expect(provider!.name).toBe('DeepSeek')
+    expect(provider!.name).toBe('通义千问')
   })
 
   it('should return undefined for invalid ID', () => {

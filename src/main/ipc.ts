@@ -298,7 +298,7 @@ export function registerIPC() {
               'Content-Type': 'application/json',
               'Authorization': `Bearer ${settings.apiKey}`,
             },
-            ...(settings.requestTimeout > 0 ? { timeout: settings.requestTimeout * 1000 } : {}),
+            timeout: (settings.requestTimeout || 600) * 1000,
           },
           (res) => {
             let data = ''

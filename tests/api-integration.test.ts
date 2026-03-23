@@ -73,17 +73,6 @@ function parseApiResponse(data: string): { content?: string; error?: string } {
 // 1. URL 构建测试
 // ============================================================
 describe('API URL 构建', () => {
-  it('DeepSeek: 正确拼接 URL', () => {
-    const result = buildRequestUrl({
-      providerId: 'deepseek',
-      apiBase: '',
-      groupId: '',
-    })
-    expect(result.url).toBe('https://api.deepseek.com/v1/chat/completions')
-    expect(result.hostname).toBe('api.deepseek.com')
-    expect(result.path).toBe('/v1/chat/completions')
-  })
-
   it('通义千问: 正确拼接带 compatible-mode 的 URL', () => {
     const result = buildRequestUrl({
       providerId: 'qwen',
@@ -135,7 +124,7 @@ describe('API URL 构建', () => {
 
   it('自定义 apiBase 覆盖默认值', () => {
     const result = buildRequestUrl({
-      providerId: 'deepseek',
+      providerId: 'kimi',
       apiBase: 'https://custom-proxy.example.com',
       groupId: '',
     })
@@ -145,11 +134,11 @@ describe('API URL 构建', () => {
 
   it('apiBase 末尾带斜线不影响拼接', () => {
     const result = buildRequestUrl({
-      providerId: 'deepseek',
-      apiBase: 'https://api.deepseek.com/',
+      providerId: 'kimi',
+      apiBase: 'https://api.moonshot.cn/',
       groupId: '',
     })
-    expect(result.url).toBe('https://api.deepseek.com/v1/chat/completions')
+    expect(result.url).toBe('https://api.moonshot.cn/v1/chat/completions')
   })
 
   it('空 providerId 回退到 minimax', () => {
@@ -190,23 +179,23 @@ describe('API URL 构建', () => {
 describe('API 请求体构建', () => {
   it('使用 provider 默认模型', () => {
     const body = buildRequestBody(
-      { providerId: 'deepseek', model: '', systemPrompt: '测试' },
+      { providerId: 'qwen', model: '', systemPrompt: '测试' },
       '你好',
     )
-    expect(body).toHaveProperty('model', 'deepseek-chat')
+    expect(body).toHaveProperty('model', 'qwen3-max')
   })
 
   it('自定义模型覆盖默认值', () => {
     const body = buildRequestBody(
-      { providerId: 'deepseek', model: 'deepseek-reasoner', systemPrompt: '' },
+      { providerId: 'qwen', model: 'qwen-plus', systemPrompt: '' },
       '你好',
     )
-    expect(body).toHaveProperty('model', 'deepseek-reasoner')
+    expect(body).toHaveProperty('model', 'qwen-plus')
   })
 
   it('包含 system 和 user 两条消息', () => {
     const body = buildRequestBody(
-      { providerId: 'deepseek', model: '', systemPrompt: '系统提示' },
+      { providerId: 'qwen', model: '', systemPrompt: '系统提示' },
       '用户消息',
     ) as any
     expect(body.messages).toHaveLength(2)
@@ -216,7 +205,7 @@ describe('API 请求体构建', () => {
 
   it('不包含 max_tokens 字段', () => {
     const body = buildRequestBody(
-      { providerId: 'deepseek', model: '', systemPrompt: '' },
+      { providerId: 'qwen', model: '', systemPrompt: '' },
       '你好',
     )
     expect(body).not.toHaveProperty('max_tokens')
@@ -266,7 +255,7 @@ describe('API 响应解析', () => {
 
   it('正确解析带 model 和 usage 的完整响应', () => {
     const data = JSON.stringify({
-      model: 'deepseek-chat',
+      model: 'qwen-plus',
       choices: [{ message: { role: 'assistant', content: '回复' } }],
       usage: { prompt_tokens: 10, completion_tokens: 5 },
     })
@@ -615,14 +604,14 @@ describe('设置默认值回退', () => {
 
   it('部分设置覆盖默认值', () => {
     const map = new Map([
-      ['providerId', 'deepseek'],
+      ['providerId', 'qwen'],
       ['apiKey', 'sk-test'],
-      ['model', 'deepseek-chat'],
+      ['model', 'qwen-plus'],
     ])
     const settings = getSettingsDefaults(map)
-    expect(settings.providerId).toBe('deepseek')
+    expect(settings.providerId).toBe('qwen')
     expect(settings.apiKey).toBe('sk-test')
-    expect(settings.model).toBe('deepseek-chat')
+    expect(settings.model).toBe('qwen-plus')
     // 其他保持默认
     expect(settings.exportFont).toBe('宋体')
   })
@@ -704,9 +693,9 @@ describe('端到端调用链路模拟', () => {
     }
   }
 
-  it('DeepSeek 完整链路', () => {
+  it('通义千问 完整链路', () => {
     const result = simulateChatSend({
-      providerId: 'deepseek',
+      providerId: 'qwen',
       apiKey: 'sk-test',
       apiBase: '',
       groupId: '',
@@ -714,10 +703,9 @@ describe('端到端调用链路模拟', () => {
       systemPrompt: '你是助手',
     })
     expect(result).not.toHaveProperty('error')
-    expect((result as any).url).toBe('https://api.deepseek.com/v1/chat/completions')
-    expect((result as any).model).toBe('deepseek-chat')
+    expect((result as any).url).toBe('https://dashscope.aliyuncs.com/compatible-mode/v1/chat/completions')
+    expect((result as any).model).toBe('qwen3-max')
     expect((result as any).headers.Authorization).toBe('Bearer sk-test')
-    expect((result as any).body).not.toHaveProperty('max_tokens')
   })
 
   it('MiniMax 完整链路（带 GroupId）', () => {
@@ -735,7 +723,7 @@ describe('端到端调用链路模拟', () => {
 
   it('无 API Key 报错', () => {
     const result = simulateChatSend({
-      providerId: 'deepseek',
+      providerId: 'qwen',
       apiKey: '',
       apiBase: '',
       groupId: '',

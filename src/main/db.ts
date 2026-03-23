@@ -151,7 +151,7 @@ export function getSettings(): AppSettings {
     exportFont: map.get('exportFont') || '宋体',
     exportFontSize: Number(map.get('exportFontSize') || '12'),
     maxRefChars: Number(map.get('maxRefChars') || '30000'),
-    requestTimeout: Number(map.get('requestTimeout') || '0'),
+    requestTimeout: Number(map.get('requestTimeout') || '600'),
   }
 }
 
